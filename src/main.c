@@ -3,6 +3,7 @@
 #include "stm32f4xx_conf.h"
 #include "mp3dec.h"
 #include "Audio.h"
+#include "hd44780.h"
 #include <string.h>
 
 // Macros
@@ -27,8 +28,7 @@ char					*read_ptr;
 
 // Private function prototypes
 static void AudioCallback(void *context,int buffer);
-static uint32_t Mp3ReadId3V2Tag(FIL* pInFile, char* pszArtist,
-		uint32_t unArtistSize, char* pszTitle, uint32_t unTitleSize);
+static uint32_t Mp3ReadId3V2Tag(FIL* pInFile, char* pszArtist, uint32_t unArtistSize, char* pszTitle, uint32_t unTitleSize);
 static void play_mp3(char* filename);
 static FRESULT play_directory (const char* path, unsigned char seek);
 
@@ -43,7 +43,6 @@ int main(void) {
 	RCC_GetClocksFreq(&RCC_Clocks);
 	SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000);
 
-	// GPIOD Peripheral clock enable
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 
 	// Configure PD12, PD13, PD14 and PD15 in output pushpull mode
@@ -53,6 +52,15 @@ int main(void) {
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+	// initialize LCD
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE | RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB |RCC_AHB1Periph_GPIOC, ENABLE);
+
+	lcd_init();
+	lcd_locate(0,0);
+	lcd_str("Helix MP3 Player");
+	lcd_locate(0,1);
+	lcd_str("SmartWires, 2018");
 
 	// Initialize USB Host Library
 	USBH_Init(&USB_OTG_Core, USB_OTG_FS_CORE_ID, &USB_Host, &USBH_MSC_cb, &USR_Callbacks);
@@ -79,6 +87,7 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 	DIR dir;
 	char *fn; /* This function is assuming non-Unicode cfg. */
 	char buffer[200];
+	char buffer2[200];
 #if _USE_LFN
 	static char lfn[_MAX_LFN + 1];
 	fno.lfname = lfn;
@@ -111,6 +120,12 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 						continue;
 					}
 
+					lcd_cls();
+					lcd_locate(0,0);
+					sprintf(buffer2, "%s",fn);	// filename on first lcd line
+					lcd_str(buffer2);
+					lcd_locate(0,1);
+					lcd_str("320kbps  44.1kHz");
 					play_mp3(buffer);
 				}
 			}
@@ -140,7 +155,7 @@ static void play_mp3(char* filename) {
 		// Play mp3
 		hMP3Decoder = MP3InitDecoder();
 		InitializeAudio(Audio44100HzSettings);
-		SetAudioVolume(170);
+		SetAudioVolume(200);
 		PlayAudioWithCallback(AudioCallback, 0);
 
 		for(;;) {
@@ -219,7 +234,8 @@ static void AudioCallback(void *context, int buffer) {
 
 	err = MP3Decode(hMP3Decoder, (unsigned char**)&read_ptr, (int*)&bytes_left, samples, 0);
 
-	if (err) {
+	if (err) 
+	{
 		/* error occurred */
 		switch (err) {
 		case ERR_MP3_INDATA_UNDERFLOW:
@@ -233,12 +249,15 @@ static void AudioCallback(void *context, int buffer) {
 			outOfData = 1;
 			break;
 		}
-	} else {
+	} 
+	else 
+	{
 		// no error
 		MP3GetLastFrameInfo(hMP3Decoder, &mp3FrameInfo);
 
 		// Duplicate data in case of mono to maintain playback speed
-		if (mp3FrameInfo.nChans == 1) {
+		if (mp3FrameInfo.nChans == 1) 
+		{
 			for(int i = mp3FrameInfo.outputSamps;i >= 0;i--) 	{
 				samples[2 * i]=samples[i];
 				samples[2 * i + 1]=samples[i];

@@ -2,7 +2,7 @@
 SRCS = main.c stm32f4xx_it.c system_stm32f4xx.c syscalls.c
 
 # Audio
-SRCS += Audio.c
+SRCS += Audio.c hd44780.c
 
 # USB
 SRCS += usbh_usr.c usb_bsp.c
