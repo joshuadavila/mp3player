@@ -16,6 +16,7 @@ USB_OTG_CORE_HANDLE		USB_OTG_Core;
 USBH_HOST				USB_Host;
 RCC_ClocksTypeDef		RCC_Clocks;
 volatile int			enum_done = 0;
+bool					displayflag	= 0;
 
 // MP3 Variables
 #define FILE_READ_BUFFER_SIZE 8192
@@ -31,6 +32,7 @@ static void AudioCallback(void *context,int buffer);
 static uint32_t Mp3ReadId3V2Tag(FIL* pInFile, char* pszArtist, uint32_t unArtistSize, char* pszTitle, uint32_t unTitleSize);
 static void play_mp3(char* filename);
 static FRESULT play_directory (const char* path, unsigned char seek);
+void LCD_ShiftLeft(void);
 
 /*
  * Main function. Called when startup code is done with
@@ -41,7 +43,7 @@ int main(void) {
 
 	// SysTick interrupt each 1ms
 	RCC_GetClocksFreq(&RCC_Clocks);
-	SysTick_Config(RCC_Clocks.HCLK_Frequency / 1000);
+	SysTick_Config(RCC_Clocks.HCLK_Frequency / 96000);
 
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 
@@ -87,7 +89,7 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 	DIR dir;
 	char *fn; /* This function is assuming non-Unicode cfg. */
 	char buffer[200];
-	char buffer2[200];
+
 #if _USE_LFN
 	static char lfn[_MAX_LFN + 1];
 	fno.lfname = lfn;
@@ -119,13 +121,6 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 						seek--;
 						continue;
 					}
-
-					lcd_cls();
-					lcd_locate(0,0);
-					sprintf(buffer2, "%s",fn);	// filename on first lcd line
-					lcd_str(buffer2);
-					lcd_locate(0,1);
-					lcd_str("320kbps  44.1kHz");
 					play_mp3(buffer);
 				}
 			}
@@ -138,6 +133,7 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 static void play_mp3(char* filename) {
 	unsigned int br, btr;
 	FRESULT res;
+	char buffer2[200];
 
 	bytes_left = FILE_READ_BUFFER_SIZE;
 	read_ptr = file_read_buffer;
@@ -152,13 +148,25 @@ static void play_mp3(char* filename) {
 		// Fill buffer
 		f_read(&file, file_read_buffer, FILE_READ_BUFFER_SIZE, &br);
 
+		// Print artist & title track information
+		lcd_cls();
+		lcd_locate(0,0);
+		sprintf(buffer2, "%s - %s", szArtist, szTitle);
+		lcd_str(buffer2);
+
 		// Play mp3
 		hMP3Decoder = MP3InitDecoder();
 		InitializeAudio(Audio44100HzSettings);
 		SetAudioVolume(200);
 		PlayAudioWithCallback(AudioCallback, 0);
 
-		for(;;) {
+		// Print bitrate, samplerate & bitpersample track info
+		lcd_locate(0,1);
+		sprintf(buffer2, "%dkbps %d.%dkHz %dbit", mp3FrameInfo.bitrate/1000, mp3FrameInfo.samprate/1000, (mp3FrameInfo.samprate%1000)/100, mp3FrameInfo.bitsPerSample);
+		lcd_str(buffer2);
+
+		for(;;) 
+		{
 			/*
 			 * If past half of buffer, refill...
 			 *
@@ -168,7 +176,8 @@ static void play_mp3(char* filename) {
 			 * Getting audio callbacks while the next part of the file is read from the
 			 * file system should not cause problems.
 			 */
-			if (bytes_left < (FILE_READ_BUFFER_SIZE / 2)) {
+			if (bytes_left < (FILE_READ_BUFFER_SIZE / 2))
+			{
 				// Copy rest of data to beginning of read buffer
 				memcpy(file_read_buffer, read_ptr, bytes_left);
 
@@ -183,7 +192,8 @@ static void play_mp3(char* filename) {
 				bytes_left = FILE_READ_BUFFER_SIZE;
 
 				// Out of data or error or user button... Stop playback!
-				if (br < btr || res != FR_OK || BUTTON) {
+				if (br < btr || res != FR_OK || BUTTON)
+				{
 					StopAudio();
 
 					// Re-initialize and set volume to avoid noise
@@ -200,6 +210,23 @@ static void play_mp3(char* filename) {
 					return;
 				}
 			}
+			
+			// to shift lcd periodically
+			if(time_var2 & 0x00004000)
+			{
+				if(displayflag == 0)
+				{
+					//GPIO_SetBits(GPIOD, GPIO_Pin_15);
+					LCD_ShiftLeft();
+					displayflag = 1;
+				}
+			}
+			else
+			{
+				//GPIO_ResetBits(GPIOD, GPIO_Pin_15);
+			 	displayflag = 0;
+			}
+			
 		}
 	}
 }
@@ -464,4 +491,3 @@ static uint32_t Mp3ReadId3V2Tag(FIL* pInFile, char* pszArtist, uint32_t unArtist
 
 	return 0;
 }
-

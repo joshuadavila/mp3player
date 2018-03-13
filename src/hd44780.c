@@ -15,7 +15,7 @@ void lcd_writenibble(unsigned char nibbleToWrite)
   GPIO_WriteBit(GPIOC, LCD_D5,(BitAction)(nibbleToWrite & 0x02));
   GPIO_WriteBit(GPIOA, LCD_D6,(BitAction)(nibbleToWrite & 0x04));
   GPIO_WriteBit(GPIOA, LCD_D7,(BitAction)(nibbleToWrite & 0x08));
-  for(delayCnt = 0; delayCnt < 50000; delayCnt++);
+  for(delayCnt = 0; delayCnt < 18000; delayCnt++);
   GPIO_WriteBit(GPIOE, LCD_EN, Bit_RESET);
 }
 
