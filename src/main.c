@@ -19,7 +19,7 @@ volatile int			enum_done = 0;
 bool					displayflag	= 0;
 
 // MP3 Variables
-#define FILE_READ_BUFFER_SIZE 8192
+#define FILE_READ_BUFFER_SIZE 16384
 MP3FrameInfo			mp3FrameInfo;
 HMP3Decoder				hMP3Decoder;
 FIL						file;
@@ -114,7 +114,7 @@ static FRESULT play_directory (const char* path, unsigned char seek) {
 				sprintf(buffer, "%s/%s", path, fn);
 
 				// Check if it is an mp3 file
-				if (strcmp("mp3", get_filename_ext(buffer)) == 0) {
+				if (strcmp("mp3", get_filename_ext(buffer)) == 0 || strcmp("MP3", get_filename_ext(buffer)) == 0) {
 
 					// Skip "seek" number of mp3 files...
 					if (seek) {
@@ -151,18 +151,18 @@ static void play_mp3(char* filename) {
 		// Print artist & title track information
 		lcd_cls();
 		lcd_locate(0,0);
-		sprintf(buffer2, "%s - %s", szArtist, szTitle);
+		sprintf(buffer2, " %s/%s ", szArtist, szTitle);
 		lcd_str(buffer2);
 
 		// Play mp3
 		hMP3Decoder = MP3InitDecoder();
 		InitializeAudio(Audio44100HzSettings);
-		SetAudioVolume(200);
+		SetAudioVolume(225);
 		PlayAudioWithCallback(AudioCallback, 0);
 
 		// Print bitrate, samplerate & bitpersample track info
 		lcd_locate(0,1);
-		sprintf(buffer2, "%dkbps %d.%dkHz %dbit", mp3FrameInfo.bitrate/1000, mp3FrameInfo.samprate/1000, (mp3FrameInfo.samprate%1000)/100, mp3FrameInfo.bitsPerSample);
+		sprintf(buffer2, " %dkbps %d.%dkHz %dbits ", mp3FrameInfo.bitrate/1000, mp3FrameInfo.samprate/1000, (mp3FrameInfo.samprate%1000)/100, mp3FrameInfo.bitsPerSample);
 		lcd_str(buffer2);
 
 		for(;;) 
@@ -238,8 +238,8 @@ static void play_mp3(char* filename) {
  * provided to the audio driver.
  */
 static void AudioCallback(void *context, int buffer) {
-	static int16_t audio_buffer0[4096];
-	static int16_t audio_buffer1[4096];
+	static int16_t audio_buffer0[8192];
+	static int16_t audio_buffer1[8192];
 
 	int offset, err;
 	int outOfData = 0;
